@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Smart Farming | Live Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{--bg:#08111f;--panel:#111e30;--panel2:#17263a;--line:#263850;--text:#edf5ff;--muted:#9bb0c9;--green:#38d996;--blue:#62a8ff;--amber:#ffc66b;--red:#ff7777}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0%,#15334a 0,transparent 32%),var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,Segoe UI,Arial,sans-serif}
+.wrap{max-width:1200px;margin:auto;padding:26px 18px 50px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.brand{display:flex;align-items:center;gap:13px}.logo{width:46px;height:46px;border-radius:14px;background:#153f38;display:grid;place-items:center;font-size:25px}.eyebrow{color:var(--green);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}.title{font-size:26px;font-weight:800;letter-spacing:-.7px}.sub{color:var(--muted);font-size:13px}
+.actions{display:flex;gap:9px;flex-wrap:wrap}button{border:1px solid var(--line);background:#1b3048;color:var(--text);padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}button.primary{background:#16875f;border-color:#16875f}button:disabled{opacity:.55;cursor:wait}
+.status{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:8px 11px;border-radius:999px;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--amber)}.dot.live{background:var(--green);box-shadow:0 0 12px var(--green)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:linear-gradient(145deg,var(--panel),#0e1a2a);border:1px solid var(--line);border-radius:17px;padding:18px;min-width:0;box-shadow:0 10px 30px #0002}.metric-label{color:var(--muted);font-size:13px}.metric{font-size:34px;font-weight:800;letter-spacing:-1px;margin:8px 0 2px}.unit{font-size:15px;color:var(--muted);font-weight:600}.hint{font-size:12px;color:var(--muted)}.icon{font-size:20px;float:right}
+.section{margin-top:17px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}.section h2{font-size:17px;margin:0}.two{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.state{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line)}.state:last-child{border:0}.pill{padding:5px 10px;border-radius:999px;font-size:11px;font-weight:800;background:#26364a;color:var(--muted)}.pill.on{background:#124b3a;color:#70efbd}.pill.off{background:#4a3032;color:#ffaaaa}
+canvas{width:100%!important;max-height:260px}.chat{display:flex;flex-direction:column;gap:10px}.messages{height:270px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:4px}.bubble{padding:11px 13px;border-radius:13px;max-width:92%;white-space:pre-wrap;font-size:13px}.bot{background:#1a2d43;border:1px solid #2a4059;align-self:flex-start}.user{background:#14563f;align-self:flex-end}.askrow{display:flex;gap:8px}.askrow input{min-width:0;flex:1;background:#0a1625;border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--text)}
+.report{white-space:pre-wrap;color:#dce9f7;font-size:13px;min-height:90px}.footer{margin-top:20px;color:var(--muted);font-size:11px;text-align:center}.notice{color:var(--amber);font-size:12px;margin-top:8px}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.three{grid-template-columns:1fr}}
+@media(max-width:480px){.grid{grid-template-columns:1fr 1fr;gap:9px}.card{padding:13px}.metric{font-size:27px}.title{font-size:21px}.wrap{padding:18px 12px 35px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="logo">🌱</div><div><div class="eyebrow">IoT + Artificial Intelligence</div><div class="title">AI Smart Farming</div><div class="sub">Live greenhouse intelligence dashboard</div></div></div>
+    <div class="actions"><span class="status"><span id="dot" class="dot"></span><span id="connection">Waiting for connection</span></span><button id="refreshBtn" onclick="loadLatest()">↻ Refresh</button></div>
+  </header>
+
+  <section class="grid">
+    <div class="card"><span class="icon">🌡️</span><div class="metric-label">Temperature</div><div class="metric" id="temp">-- <span class="unit">°C</span></div><div class="hint" id="tempHint">Waiting for sensor data</div></div>
+    <div class="card"><span class="icon">💧</span><div class="metric-label">Humidity</div><div class="metric" id="humidity">-- <span class="unit">%</span></div><div class="hint">Air relative humidity</div></div>
+    <div class="card"><span class="icon">🌿</span><div class="metric-label">Soil moisture</div><div class="metric" id="soil">-- <span class="unit">%</span></div><div class="hint" id="soilHint">Sensor-derived percentage</div></div>
+    <div class="card"><span class="icon">🕒</span><div class="metric-label">Last update</div><div class="metric" style="font-size:20px" id="updated">--</div><div class="hint" id="source">Blynk Cloud</div></div>
+  </section>
+
+  <section class="section two">
+    <div class="card"><div class="section-head"><h2>📈 Sensor history</h2><span class="hint">Stored every 5 minutes</span></div><canvas id="chart"></canvas><div class="notice">Charts begin filling after the Google Sheets logger starts. They do not contain earlier unrecorded data.</div></div>
+    <div class="card"><div class="section-head"><h2>⚙️ Automation status</h2><span class="hint">Existing ESP8266 rules</span></div>
+      <div class="state"><div><b>Cooling fan</b><div class="hint">ON above 35°C; OFF at/below 33°C</div></div><span id="fan" class="pill">--</span></div>
+      <div class="state"><div><b>Water pump</b><div class="hint">ON below 50%; OFF at 70%</div></div><span id="pump" class="pill">--</span></div>
+      <div class="state"><div><b>AI control mode</b><div class="hint">Advisory only; no relay commands</div></div><span class="pill on">SAFE</span></div>
+      <div class="notice">If fan/pump virtual pins are not configured, status is shown as expected from sensor thresholds, not as confirmed relay feedback.</div>
+    </div>
+  </section>
+
+  <section class="section two">
+    <div class="card"><div class="section-head"><h2>🧠 Ask the farming AI</h2><span class="pill on">Gemini AI</span></div>
+      <div class="chat"><div class="messages" id="messages"><div class="bubble bot">Hello! I am your Smart Farming Assistant. I can explain the latest readings, discuss irrigation and ventilation, and help interpret sensor trends.</div></div>
+        <div class="askrow"><input id="question" placeholder="Ask: Is my soil moisture low?" onkeydown="if(event.key==='Enter')askAI()"><button class="primary" id="askBtn" onclick="askAI()">Ask AI</button></div>
+      </div>
+    </div>
+    <div class="card"><div class="section-head"><h2>📋 AI daily report</h2><button onclick="generateReport()" id="reportBtn">Generate report</button></div>
+      <div class="report" id="report">No report loaded yet. Generate a report after sensor history has been collected.</div>
+      <div class="hint" style="margin-top:12px">A scheduled report is also generated daily by Apps Script.</div>
+    </div>
+  </section>
+  <div class="footer">AI Smart Farming Demonstration · ESP8266 + Blynk + Google Sheets + Gemini · AI advice is educational, not a crop-specific diagnosis.</div>
+</div>
+
+<script>
+/* Paste your deployed Apps Script Web App URL here. Keep all API keys in Apps Script, never here. */
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+let dashboardPin = '';
+let chart;
+
+function getPin(){
+  if(!dashboardPin){
+    dashboardPin = prompt('Enter the dashboard PIN configured in Apps Script Script Properties:') || '';
+  }
+  return dashboardPin;
+}
+function callBackend(action, callbackName, extra={}){
+  const pin=getPin();
+  if(!pin) return;
+  if(!API_URL.startsWith('https://script.google.com/')) {
+    alert('First paste your deployed Apps Script Web App URL into index.html.');
+    return;
+  }
+  const params=new URLSearchParams({action, pin, callback:callbackName, _:Date.now().toString(), ...extra});
+  const s=document.createElement('script');
+  s.src=API_URL+'?'+params.toString();
+  s.onerror=()=>{setConnection(false,'Backend request failed. Check deployment URL / access.');s.remove();};
+  document.body.appendChild(s);
+  setTimeout(()=>s.remove(),15000);
+}
+function setConnection(ok,msg){
+  document.getElementById('dot').className=ok?'dot live':'dot';
+  document.getElementById('connection').textContent=msg;
+}
+function statePill(id,on,label){
+  const el=document.getElementById(id);el.textContent=label;
+  el.className='pill '+(on?'on':'off');
+}
+function farmLatestCallback(data){
+  if(!data.ok){setConnection(false,data.error);return;}
+  const s=data.snapshot;
+  document.getElementById('temp').innerHTML=Number(s.temperature).toFixed(1)+' <span class="unit">°C</span>';
+  document.getElementById('humidity').innerHTML=Number(s.humidity).toFixed(1)+' <span class="unit">%</span>';
+  document.getElementById('soil').innerHTML=Number(s.soilMoisture).toFixed(0)+' <span class="unit">%</span>';
+  document.getElementById('tempHint').textContent=s.temperature>35?'Above fan ON threshold':'Within configured fan threshold';
+  document.getElementById('soilHint').textContent=s.soilMoisture<50?'Below pump ON threshold':(s.soilMoisture>=70?'At/above pump OFF threshold':'Between irrigation thresholds');
+  document.getElementById('updated').textContent=new Date(s.timestamp).toLocaleTimeString();
+  document.getElementById('source').textContent=s.source||'Blynk Cloud';
+  const fanKnown=s.fanState!==null, pumpKnown=s.pumpState!==null;
+  statePill('fan',fanKnown?s.fanState:s.expectedFanOn,(fanKnown?'Actual: ':'Expected: ')+(fanKnown?(s.fanState?'ON':'OFF'):(s.expectedFanOn?'ON':'OFF')));
+  statePill('pump',pumpKnown?s.pumpState:s.expectedPumpOn,(pumpKnown?'Actual: ':'Expected: ')+(pumpKnown?(s.pumpState?'ON':'OFF'):(s.expectedPumpOn?'ON':'OFF')));
+  setConnection(true,'Connected · live data received');
+  loadHistory();
+}
+function loadLatest(){callBackend('latest','farmLatestCallback');}
+function addMessage(text,who){const d=document.createElement('div');d.className='bubble '+who;d.textContent=text;const box=document.getElementById('messages');box.appendChild(d);box.scrollTop=box.scrollHeight;}
+function farmAskCallback(data){
+  document.getElementById('askBtn').disabled=false;
+  if(!data.ok){addMessage('Error: '+data.error,'bot');return;}
+  addMessage(data.answer,'bot');
+}
+function askAI(){
+  const input=document.getElementById('question'),q=input.value.trim();if(!q)return;
+  addMessage(q,'user');input.value='';
+  document.getElementById('askBtn').disabled=true;
+  callBackend('ask','farmAskCallback',{q});
+}
+function farmReportCallback(data){
+  document.getElementById('reportBtn').disabled=false;
+  document.getElementById('report').textContent=data.ok?data.report:('Error: '+data.error);
+}
+function generateReport(){
+  document.getElementById('reportBtn').disabled=true;
+  document.getElementById('report').textContent='Generating report from stored sensor history…';
+  callBackend('generateReport','farmReportCallback');
+}
+function farmHistoryCallback(data){
+  if(!data.ok||!data.rows)return;
+  const labels=data.rows.map(r=>new Date(r[0]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  const datasets=[
+    {label:'Temperature °C',data:data.rows.map(r=>Number(r[1])),yAxisID:'y'},
+    {label:'Humidity %',data:data.rows.map(r=>Number(r[2])),yAxisID:'y1'},
+    {label:'Soil moisture %',data:data.rows.map(r=>Number(r[3])),yAxisID:'y1'}
+  ];
+  if(chart)chart.destroy();
+  chart=new Chart(document.getElementById('chart'),{type:'line',data:{labels,datasets:datasets.map(d=>({...d,tension:.3,pointRadius:1,borderWidth:2}))},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#c8d8ea'}}},scales:{x:{ticks:{color:'#91a8c2',maxTicksLimit:8},grid:{color:'#20334a'}},y:{position:'left',ticks:{color:'#91a8c2'},grid:{color:'#20334a'}},y1:{position:'right',ticks:{color:'#91a8c2'},grid:{drawOnChartArea:false}}}}});
+}
+function loadHistory(){callBackend('history','farmHistoryCallback');}
+function farmReportLoadCallback(data){if(data.ok)document.getElementById('report').textContent=data.report;else document.getElementById('report').textContent='Error: '+data.error;}
+loadLatest();
+callBackend('report','farmReportLoadCallback');
+setInterval(loadLatest,60000);
+</script>
+</body>
+</html>
